@@ -7,11 +7,13 @@ from torch import nn
 import torch
 import torch.nn as nn
 
+import torch
+import torch.nn as nn
+
 class TinyVGG(nn.Module):
-    """Creates the TinyVGG architecture.
+    """Creates the TinyVGG architecture with adjustments to reduce underfitting.
 
     Replicates the TinyVGG architecture from the CNN explainer website in PyTorch.
-    See the original architecture here: https://poloclub.github.io/cnn-explainer/
 
     Args:
     input_shape: An integer indicating the number of input channels.
@@ -25,21 +27,25 @@ class TinyVGG(nn.Module):
                       out_channels=hidden_units, 
                       kernel_size=3, 
                       stride=1, 
-                      padding=0),  
+                      padding=1),  # Added padding to preserve spatial dimensions
             nn.ReLU(),
+            nn.BatchNorm2d(hidden_units),  # Batch Normalization
             nn.Conv2d(in_channels=hidden_units, 
                       out_channels=hidden_units,
                       kernel_size=3,
                       stride=1,
-                      padding=0),
+                      padding=1),  # Added padding to preserve spatial dimensions
             nn.ReLU(),
+            nn.BatchNorm2d(hidden_units),  # Batch Normalization
             nn.MaxPool2d(kernel_size=2, stride=2)
         )
         self.conv_block_2 = nn.Sequential(
-            nn.Conv2d(hidden_units, hidden_units, kernel_size=3, padding=0),
+            nn.Conv2d(hidden_units, hidden_units*2, kernel_size=3, padding=1),  # Increased the number of filters
             nn.ReLU(),
-            nn.Conv2d(hidden_units, hidden_units, kernel_size=3, padding=0),
+            nn.BatchNorm2d(hidden_units*2),  # Batch Normalization
+            nn.Conv2d(hidden_units*2, hidden_units*2, kernel_size=3, padding=1),  # Increased the number of filters
             nn.ReLU(),
+            nn.BatchNorm2d(hidden_units*2),  # Batch Normalization
             nn.MaxPool2d(2)
         )
         
@@ -47,7 +53,10 @@ class TinyVGG(nn.Module):
         self._conv_output_size = self._get_conv_output_size(input_shape)
         self.classifier = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(in_features=self._conv_output_size, out_features=output_shape)
+            nn.Linear(in_features=self._conv_output_size, out_features=512),  # Increased the size of the hidden layer
+            nn.ReLU(),
+            nn.Dropout(p=0.5),  # Dropout to prevent overfitting
+            nn.Linear(in_features=512, out_features=output_shape)
         )
 
     def _get_conv_output_size(self, input_shape: int) -> int:
@@ -63,4 +72,5 @@ class TinyVGG(nn.Module):
         x = self.conv_block_2(x)
         x = self.classifier(x)
         return x
+
 
